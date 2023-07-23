@@ -57,9 +57,12 @@ aipython3.buildPythonPackage {
     getpass-asterisk
     safetensors
     datasets
+    requests
+    pytorch-lightning
   ];
+  passthru.optional-dependencies = [aipython3.requests aipython3.numpy aipython3.pytorch-lightning];
   nativeBuildInputs = [ aipython3.pythonRelaxDepsHook ];
-  pythonRemoveDeps = [ "clip" "pyreadline3" "flaskwebgui" "opencv-python" ];
+  pythonRemoveDeps = [ "clip" "pyreadline3" "flaskwebgui" "opencv-python" "requests" "numpy" ];
   pythonRelaxDeps = [ "dnspython" "protobuf" "flask" "flask-socketio" "pytorch-lightning" ];
   makeWrapperArgs = [
     '' --run '
@@ -81,9 +84,10 @@ aipython3.buildPythonPackage {
       fi
       '
     ''
+    # not useful for gfx803. This is only useful for gfx1031 to act like 1030 (I think)
     # See note about consumer GPUs:
     # https://docs.amd.com/bundle/ROCm-Deep-Learning-Guide-v5.4.3/page/Troubleshooting.html
-    " --set-default HSA_OVERRIDE_GFX_VERSION 10.3.0"
+    # " --set-default HSA_OVERRIDE_GFX_VERSION 10.3.0"
   ];
   patchPhase = ''
     runHook prePatch
@@ -101,6 +105,11 @@ import subprocess
     substituteInPlace ./ldm/invoke/config/invokeai_configure.py --replace \
       "shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)" \
       "subprocess.call('cp -r --no-preserve=mode {configs_src} {configs_dest}'.format(configs_src=configs_src, configs_dest=configs_dest), shell=True)"
+
+    # rank_zero_only is in utilities, not in distributed
+    substituteInPlace ./ldm/models/diffusion/ddpm.py --replace \
+      "pytorch_lightning.utilities.distributed" \
+      "pytorch_lightning.utilities"
     runHook postPatch
   '';
   postFixup = ''

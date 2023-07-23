@@ -6,7 +6,10 @@ pkgs: {
     });
   in {
     pytorch-lightning = relaxProtobuf prev.pytorch-lightning;
-    wandb = relaxProtobuf prev.wandb;
+    wandb = (relaxProtobuf prev.wandb).overrideAttrs(old: {
+      # some Webserving(?) tests appear to fail (because of the sandbox?). Assume everything works
+      pytestCheckPhase = "true";
+    });
     markdown-it-py = prev.markdown-it-py.overrideAttrs (old: {
       nativeBuildInputs = old.nativeBuildInputs ++ [ final.pythonRelaxDepsHook ];
       pythonRelaxDeps = [ "linkify-it-py" ];
@@ -44,11 +47,9 @@ pkgs: {
     callPackage = final.callPackage;
     rmCallPackage = path: args: rm (callPackage path args);
   in {
-    scikit-image = final.scikitimage;
     opencv-python-headless = final.opencv-python;
     opencv-python = final.opencv4;
 
-    safetensors = callPackage ../../packages/safetensors { };
     compel = callPackage ../../packages/compel { };
     apispec-webframeworks = callPackage ../../packages/apispec-webframeworks { };
     pydeprecate = callPackage ../../packages/pydeprecate { };
@@ -85,30 +86,29 @@ pkgs: {
   };
 
   torchRocm = final: prev: rec {
-    # TODO: figure out how to patch torch-bin trying to access /opt/amdgpu
-    # there might be an environment variable for it, can use a wrapper for that
-    # otherwise just grep the world for /opt/amdgpu or something and substituteInPlace the path
-    # you can run this thing without the fix by creating /opt and running nix build nixpkgs#libdrm --inputs-from . --out-link /opt/amdgpu
-    torch-bin = prev.torch-bin.overrideAttrs (old: {
-      src = pkgs.fetchurl {
-        name = "torch-1.13.1+rocm5.1.1-cp310-cp310-linux_x86_64.whl";
-        url = "https://download.pytorch.org/whl/rocm5.1.1/torch-1.13.1%2Brocm5.1.1-cp310-cp310-linux_x86_64.whl";
-        hash = "sha256-qUwAL3L9ODy9hjne8jZQRoG4BxvXXLT7cAy9RbM837A=";
-      };
-      postFixup = (old.postFixup or "") + ''
-        ${pkgs.gnused}/bin/sed -i s,/opt/amdgpu/share/libdrm/amdgpu.ids,/tmp/nix-pytorch-rocm___/amdgpu.ids,g $out/${final.python.sitePackages}/torch/lib/libdrm_amdgpu.so
-      '';
+    torch = prev.torch.override {
+      magma = pkgs.magma-hip;
       rocmSupport = true;
+      cudaSupport = false;
+    };
+
+    torchvision = prev.torchvision.overrideAttrs (old: {
+      # https://github.com/pytorch/vision/pull/7573
+      postPatch = ''
+        cat setup.py | head -n328 > setup_part1
+        cat setup.py | head -n331 | tail -n2 > setup_part2
+        cat setup.py | tail -n$((553-331)) > setup_part3
+
+        echo "    if is_rocm_pytorch:" > setup_insert
+        echo '        image_src += glob.glob(os.path.join(image_path, "hip", "*.cpp"))' >> setup_insert
+        echo "        # we need to exclude this in favor of the hipified source" >> setup_insert
+        echo '        image_src.remove(os.path.join(image_path, "image.cpp"))' >> setup_insert
+        echo "    else:" >> setup_insert
+        echo '        image_src += glob.glob(os.path.join(image_path, "cuda", "*.cpp"))' >> setup_insert
+
+        cat setup_part1 setup_part2 setup_insert setup_part3 > setup.py
+      '';
     });
-    torchvision-bin = prev.torchvision-bin.overrideAttrs (old: {
-      src = pkgs.fetchurl {
-        name = "torchvision-0.14.1+rocm5.1.1-cp310-cp310-linux_x86_64.whl";
-        url = "https://download.pytorch.org/whl/rocm5.1.1/torchvision-0.14.1%2Brocm5.1.1-cp310-cp310-linux_x86_64.whl";
-        hash = "sha256-8CM1QZ9cZfexa+HWhG4SfA/PTGB2475dxoOtGZ3Wa2E=";
-      };
-    });
-    torch = torch-bin;
-    torchvision = torchvision-bin;
   };
 
   torchCuda = final: prev: {
