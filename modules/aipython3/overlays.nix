@@ -86,11 +86,13 @@ pkgs: {
   };
 
   torchRocm = final: prev: rec {
-    torch = prev.torch.override {
+    torch = (prev.torch.override {
       magma = pkgs.magma-hip;
       rocmSupport = true;
       cudaSupport = false;
-    };
+    }).overrideAttrs(old: {
+      patches = old.patches ++ [ ./gfx803.patch ];
+    });
 
     torchvision = prev.torchvision.overrideAttrs (old: {
       # https://github.com/pytorch/vision/pull/7573

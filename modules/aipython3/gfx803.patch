@@ -1,0 +1,65 @@
+diff --git a/aten/src/ATen/native/cuda/jit_utils.cpp b/aten/src/ATen/native/cuda/jit_utils.cpp
+index 61781e0..a20dcae 100644
+--- a/aten/src/ATen/native/cuda/jit_utils.cpp
++++ b/aten/src/ATen/native/cuda/jit_utils.cpp
+@@ -1558,6 +1558,8 @@ NvrtcFunction jit_pwise_function(
+     args.push_back("-DNDEBUG");
+   #endif
+ 
++  args.push_back("--gpu-architecture=gfx803");
++
+   const auto compilation_result =
+       nvrtc.nvrtcCompileProgram(program, args.size(), args.data());
+ 
+diff --git a/caffe2/cuda_rtc/common_rtc.h b/caffe2/cuda_rtc/common_rtc.h
+index 9d9582d..7be25ff 100644
+--- a/caffe2/cuda_rtc/common_rtc.h
++++ b/caffe2/cuda_rtc/common_rtc.h
+@@ -45,8 +45,8 @@ class CudaRTCFunction {
+     // TODO(Yangqing): how to find the current gpu architecture instead of hard
+     // coding it?
+     const char* nvrtc_opts[] = {
+-        "--gpu-architecture=compute_35", "--use_fast_math"};
+-    nvrtcResult compile_result = nvrtcCompileProgram(prog, 2, nvrtc_opts);
++        "--gpu-architecture=compute_35", "--use_fast_math", "--gpu-architecture=gfx803"};
++    nvrtcResult compile_result = nvrtcCompileProgram(prog, 3, nvrtc_opts);
+     if (compile_result != NVRTC_SUCCESS) {
+       size_t log_size;
+       NVRTC_CHECK(nvrtcGetProgramLogSize(prog, &log_size));
+diff --git a/third_party/nvfuser/csrc/executor_utils.cpp b/third_party/nvfuser/csrc/executor_utils.cpp
+index 34cc176..bec33fa 100644
+--- a/third_party/nvfuser/csrc/executor_utils.cpp
++++ b/third_party/nvfuser/csrc/executor_utils.cpp
+@@ -1151,6 +1151,7 @@ std::pair<NvrtcFunction, std::string> nvrtcCompile(
+   at::globalContext().getNVRTC().nvrtcAddNameExpression(
+       program, func_name.c_str());
+ 
++  args.push_back("--gpu-architecture=gfx803");
+   {
+     FUSER_PERF_SCOPE("executor_utils::Nvrtc::CompileProgram");
+ 
+diff --git a/torch/csrc/jit/codegen/fuser/cuda/fused_kernel.cpp b/torch/csrc/jit/codegen/fuser/cuda/fused_kernel.cpp
+index b1b05c4..e58d30d 100644
+--- a/torch/csrc/jit/codegen/fuser/cuda/fused_kernel.cpp
++++ b/torch/csrc/jit/codegen/fuser/cuda/fused_kernel.cpp
+@@ -150,6 +150,7 @@ FusedKernelCUDA::FusedKernelCUDA(
+   const std::vector<const char*> args = {
+       "--std=c++17", compute.c_str(), "-default-device"};
+ #endif
++  args.push_back("--gpu-architecture=gfx803");
+   const auto result =
+       nvrtc().nvrtcCompileProgram(program, args.size(), args.data());
+   if (result != NVRTC_SUCCESS) {
+diff --git a/torch/csrc/jit/tensorexpr/cuda_codegen.cpp b/torch/csrc/jit/tensorexpr/cuda_codegen.cpp
+index a51b592..85708be 100644
+--- a/torch/csrc/jit/tensorexpr/cuda_codegen.cpp
++++ b/torch/csrc/jit/tensorexpr/cuda_codegen.cpp
+@@ -1333,7 +1333,7 @@ void CudaCodeGen::CompileToNVRTC(
+   const std::vector<const char*> args = {
+       "--std=c++17", compute.c_str(), "-default-device"};
+ #endif
+-
++  args.push_back("--gpu-architecture=gfx803");
+   auto result = nvrtc().nvrtcCompileProgram(program, args.size(), args.data());
+   if (result != NVRTC_SUCCESS) {
+     // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
