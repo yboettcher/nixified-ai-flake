@@ -91,7 +91,7 @@ pkgs: {
       rocmSupport = true;
       cudaSupport = false;
     }).overrideAttrs(old: {
-      patches = old.patches ++ [ ./gfx803.patch ];
+      patches = old.patches ++ [ ./torch_gfx803.patch ];
     });
 
     torchvision = prev.torchvision.overrideAttrs (old: {
@@ -110,6 +110,10 @@ pkgs: {
 
         cat setup_part1 setup_part2 setup_insert setup_part3 > setup.py
       '';
+    });
+
+    miopen = prev.miopen.overrideAttrs (old: {
+      patches = old.patches ++ [ ./miopen_gfx803.patch ];
     });
   };
 
