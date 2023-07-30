@@ -90,6 +90,9 @@ pkgs: {
       magma = pkgs.magma-hip;
       rocmSupport = true;
       cudaSupport = false;
+      miopen = pkgs.miopen.overrideAttrs (old: {
+        patches = [ ./miopen_gfx803.patch ];
+      });
     }).overrideAttrs(old: {
       patches = old.patches ++ [ ./torch_gfx803.patch ];
     });
@@ -110,10 +113,6 @@ pkgs: {
 
         cat setup_part1 setup_part2 setup_insert setup_part3 > setup.py
       '';
-    });
-
-    miopen = prev.miopen.overrideAttrs (old: {
-      patches = old.patches ++ [ ./miopen_gfx803.patch ];
     });
   };
 
